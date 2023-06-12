@@ -1,24 +1,9 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const mysql = require('mysql2');
+const mongoose = require('mongoose');
 
 const app = express();
 const port = 3000;
-
-// Create a MySQL connection
-const connection = mysql.createConnection({
-    host: 'localhost',
-    port: 3306,
-    user: 'root',
-    password: 'Buddha%55',
-    database: 'todo_app',
-});
-
-// Connect to the database
-connection.connect(err => {
-    if (err) throw err;
-    console.log('Connected to MySQL database');
-});
 
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
@@ -26,43 +11,86 @@ app.set('view engine', 'ejs');
 // Parse URL-encoded bodies
 app.use(bodyParser.urlencoded({ extended: false }));
 
+// Connect to MongoDB
+// Connect to MongoDB
+mongoose.connect('mongodb+srv://binay:binay@cluster0.srewl22.mongodb.net/todo_ejs', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+  .then(() => {
+    console.log('Connected to MongoDB');
+  })
+  .catch((error) => {
+    console.log('Error connecting to MongoDB:', error);
+  });
+
+// Todo model
+const Todo = mongoose.model('Todo', {
+  title: String,
+  completed: Boolean
+});
+
 // Render the list of todos
 app.get('/', (req, res) => {
-    connection.query('SELECT * FROM todos', (err, results) => {
-        if (err) throw err;
-        res.render('index', { todos: results });
+  Todo.find({})
+    .then((todos) => {
+      res.render('index', { todos });
+    })
+    .catch((error) => {
+      console.log('Error retrieving todos:', error);
+      res.status(500).send('Internal Server Error');
     });
 });
 
 // Create a new todo
 app.post('/todos', (req, res) => {
-    const { title } = req.body;
-    connection.query('INSERT INTO todos (title) VALUES (?)', [title], (err, result) => {
-        if (err) throw err;
-        res.redirect('/');
+  const { title } = req.body;
+
+  const newTodo = new Todo({
+    title: title,
+    completed: false
+  });
+
+  newTodo.save()
+    .then(() => {
+      res.redirect('/');
+    })
+    .catch((error) => {
+      console.log('Error creating new todo:', error);
+      res.status(500).send('Internal Server Error');
     });
 });
 
 // Update the completion status of a todo
 app.post('/todos/:id', (req, res) => {
-    const id = req.params.id;
-    const completed = req.body.completed === 'true';
-    connection.query('UPDATE todos SET completed = ? WHERE id = ?', [completed, id], (err, result) => {
-        if (err) throw err;
-        res.redirect('/');
+  const id = req.params.id;
+  const completed = req.body.completed === 'true';
+
+  Todo.findByIdAndUpdate(id, { completed: completed })
+    .then(() => {
+      res.redirect('/');
+    })
+    .catch((error) => {
+      console.log('Error updating todo:', error);
+      res.status(500).send('Internal Server Error');
     });
 });
 
 // Delete a todo
 app.post('/todos/:id/delete', (req, res) => {
-    const id = req.params.id;
-    connection.query('DELETE FROM todos WHERE id = ?', [id], (err, result) => {
-        if (err) throw err;
-        res.redirect('/');
+  const id = req.params.id;
+
+  Todo.findByIdAndRemove(id)
+    .then(() => {
+      res.redirect('/');
+    })
+    .catch((error) => {
+      console.log('Error deleting todo:', error);
+      res.status(500).send('Internal Server Error');
     });
 });
 
 // Start the server
 app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
+  console.log(`Server running on http://localhost:${port}`);
 });
